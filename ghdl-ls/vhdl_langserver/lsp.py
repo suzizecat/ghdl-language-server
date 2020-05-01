@@ -3,12 +3,15 @@ import logging
 import json
 import attr
 from attr.validators import instance_of
-
+import typing as T
 try:
     from urllib.parse import unquote, quote
 except ImportError:
     from urllib2 import quote
     from urlparse import unquote
+
+from . import vhdl_ls
+
 
 log = logging.getLogger('ghdl-ls')
 
@@ -16,7 +19,7 @@ class ProtocolError(Exception):
     pass
 
 class LSPConn:
-    def __init__(self, reader, writer):
+    def __init__(self, reader : T.BinaryIO, writer : T.BinaryIO):
         self.reader = reader
         self.writer = writer
 
@@ -32,8 +35,8 @@ class LSPConn:
         self.writer.write(out.encode())
         self.writer.flush()
 
-def path_from_uri(uri):
-    # Convert file uri to path (strip html like head part)
+def path_from_uri(uri : str):
+    """Convert file uri to path (strip html like head part)"""
     if not uri.startswith("file://"):
         return uri
     if os.name == "nt":
@@ -43,8 +46,8 @@ def path_from_uri(uri):
     return os.path.normpath(unquote(path))
 
 
-def path_to_uri(path):
-    # Convert path to file uri (add html like head part)
+def path_to_uri(path : str):
+    """Convert path to file uri (add html like head part)"""
     if os.name == "nt":
         return "file:///" + quote(path.replace('\\', '/'))
     else:
@@ -52,7 +55,7 @@ def path_to_uri(path):
 
 
 class LanguageProtocolServer(object):
-    def __init__(self, handler, conn):
+    def __init__(self, handler : "vhdl_ls.VhdlLanguageServer", conn : LSPConn):
         self.conn = conn
         self.handler = handler
         if handler is not None:
@@ -61,7 +64,9 @@ class LanguageProtocolServer(object):
         self._next_id = 0
 
     def read_request(self):
-        headers = {}
+        headers : T.Dict[str,str] = dict()
+        # The loop will iterate to read the header.
+        # When the complete header is read, the function will read the whole body at once and return it.
         while True:
             # Read a line
             line = self.conn.readline()
@@ -73,7 +78,7 @@ class LanguageProtocolServer(object):
             line = line[:-2]
             if not line:
                 # End of headers.
-                log.debug('Headers: %r', headers)
+                log.debug(f"Headers: {headers:!r}")
                 length = headers.get('Content-Length', None)
                 if length is not None:
                     body = self.conn.read(int(length))
@@ -93,7 +98,7 @@ class LanguageProtocolServer(object):
 
             # Text to JSON
             msg = json.loads(body)
-            log.debug('Read msg: %s', msg)
+            log.debug(f"Read msg: {msg}")
 
             reply = self.handle(msg)
             if reply is not None:
@@ -106,7 +111,7 @@ class LanguageProtocolServer(object):
         method = msg.get('method', None)
         if method is None:
             # This is a reply.
-            log.error('Unexpected reply for %s', tid)
+            log.error(f'Unexpected reply for {tid}')
             return
         params = msg.get('params', None)
         fmethod = self.handler.dispatcher.get(method, None)
@@ -117,7 +122,7 @@ class LanguageProtocolServer(object):
             if tid is None:
                 # If this was just a notification, discard it
                 return None
-            log.debug('Response: %s', response)
+            log.debug(f'Response: {response}')
             rbody = {
                 "jsonrpc": "2.0",
                 "id": tid,
@@ -125,7 +130,7 @@ class LanguageProtocolServer(object):
             }
         else:
             # Unknown method.
-            log.error('Unknown method %s', method)
+            log.error(f'Unknown method {method}')
             # If this was just a notification, discard it
             if tid is None:
                 return None
@@ -135,14 +140,14 @@ class LanguageProtocolServer(object):
                 "id": tid,
                 "error": {
                     "code": JSONErrorCodes.MethodNotFound,
-                    "message": "unknown method {}".format(method)
+                    "message": f"unknown method {method}"
                 }
             }
         return rbody
 
     def write_output(self, body):
         output = json.dumps(body, separators=(",", ":"))
-        self.conn.write('Content-Length: {}\r\n'.format(len(output)))
+        self.conn.write(f'Content-Length: {len(output)}\r\n')
         self.conn.write('\r\n')
         self.conn.write(output)
 

@@ -1,10 +1,11 @@
-#!/usr/bin/env python
-from __future__ import absolute_import
+#!/usr/bin/env python3
+# from __future__ import absolute_import
 
 import argparse
 import logging
 import sys
 import os
+import typing as T
 
 import libghdl
 import libghdl.thin.errorout_console
@@ -17,7 +18,7 @@ logger = logging.getLogger('ghdl-ls')
 
 class LSPConnTrace(object):
     """Wrapper class to save in and out packets"""
-    def __init__(self, basename, conn):
+    def __init__(self, basename : str, conn : lsp.LSPConn):
         self.conn = conn
         self.trace_in = open(basename + '.in', 'w')
         self.trace_out = open(basename + '.out', 'w')

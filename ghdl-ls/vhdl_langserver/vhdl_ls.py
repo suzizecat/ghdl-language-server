@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 
 class VhdlLanguageServer(object):
     def __init__(self):
-        self.workspace = None
+        self.workspace : Workspace = None
         self.lsp = None
         self._shutdown = False
         self.dispatcher = {
@@ -30,7 +30,7 @@ class VhdlLanguageServer(object):
             'workspace/xGetEntityInterface': self.workspace_xGetEntityInterface,
             }
 
-    def set_lsp(self, server):
+    def set_lsp(self, server : lsp.LanguageProtocolServer):
         self.lsp = server
 
     def shutdown(self):
